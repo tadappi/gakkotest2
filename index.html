@@ -43,9 +43,19 @@ scene.add(new THREE.AmbientLight(0x888888));
 const dir = new THREE.DirectionalLight(0xffffff,1);
 dir.position.set(30,100,30); scene.add(dir);
 
-/* ===== 2.モデル読み込み ===== */
-new THREE.GLTFLoader().load('model6.glb',g=>{
-  const m=g.scene; m.scale.set(.1,.1,.1); scene.add(m);
+/* ========= モデル読み込み ========= */
+new THREE.GLTFLoader().load('model6.glb', g => {
+  const m = g.scene;
+  m.scale.set(0.1, 0.1, 0.1);
+  m.position.set(0, 0, 0);      // 必要なら位置も
+
+/* --- ここから 角度を degree で指定 ---------- */
+  const deg   = d => d * Math.PI / 180;      // 変換ヘルパ
+  const rot   = { x: 270, y: 0, z: 0 };      // ← 好きな角度（°）に変更
+  m.rotation.set( deg(rot.x), deg(rot.y), deg(rot.z) );
+/* ------------------------------------------- */
+
+  scene.add(m);
 });
 
 /* ===== 3.スプライト定義 & 生成 ===== */
