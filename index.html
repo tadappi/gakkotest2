@@ -69,7 +69,7 @@ const loader = new THREE.TextureLoader();
 const sprites=[], group=new THREE.Group();       // グループにまとめると管理しやすい
 spriteInfo.forEach(info=>{
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:loader.load(info.img),transparent:true}));
-  sp.scale.set(4,4,1);
+  sp.scale.set(2,2,1);
   sp.position.set(...info.pos);
   sp.userData=info;
   sprites.push(sp); group.add(sp);
