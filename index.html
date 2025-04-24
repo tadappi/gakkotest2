@@ -31,6 +31,10 @@ scene.add(new THREE.AxesHelper(10));
 
 const camera   = new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000);
 camera.position.set(0,18,23);
+const radius = camera.position.length();   // 現在のカメラ距離をそのまま半径に
+const clock  = new THREE.Clock();          // 経過時間を測る時計
+const REV_PER_MIN   = 1;   // 1回転 / 1分（=60秒） に相当する角速度［ラジアン/秒］
+const ANGULAR_SPEED = REV_PER_MIN * 2 * Math.PI / 60;  // ω = 2π / 60
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth,innerHeight);
@@ -120,7 +124,21 @@ addEventListener('click',()=>{
 
 /* ===== 5.レンダーループ ===== */
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
-(function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera)})();
+function animate(){
+  requestAnimationFrame(animate);
+
+  // 経過時間 t（秒）→ 角度 θ = ωt
+  const t = clock.getElapsedTime();
+  const angle = ANGULAR_SPEED * t;
+
+  // 円軌道座標（XZ 平面をぐるり）
+  camera.position.x =  radius * Math.sin(angle);
+  camera.position.z =  radius * Math.cos(angle);
+  camera.lookAt(0, 5, 0);   // 原点を少し上（必要なら変更）
+
+  renderer.render(scene, camera);
+}
+animate();
 </script>
 </body>
 </html>
