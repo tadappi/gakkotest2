@@ -18,12 +18,13 @@
 <body>
 <div id="tooltip"></div>
 
-<!-- Three r147（ビルド版）＋ OrbitControls.js & GLTFLoader.js -->
+<!-- ★ three と OrbitControls 読み込みは今のまま r147 でOK -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
+  
 /* ===== 0.基本セットアップ ===== */
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xcccccc);
@@ -33,9 +34,25 @@ const camera   = new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000)
 camera.position.set(0,18,23);
 const radius = camera.position.length();   // 現在のカメラ距離をそのまま半径に
 const clock  = new THREE.Clock();          // 経過時間を測る時計
+
 const REV_PER_MIN   = 0.5;   // 1回転 / 1分（=60秒） に相当する角速度［ラジアン/秒］
 const ANGULAR_SPEED = REV_PER_MIN * 2 * Math.PI / 60;  // ω = 2π / 60
 
+const AUTO_DELAY_MS = 10_000;                    // 無操作10秒で自動回転再開
+let  autoRotate     = true;                      // 現在自動回転中？
+let  lastUserTime   = performance.now();         // 最後に操作した時刻
+let  angleOffset    = 0;                         // 再開時の位相補正用
+const radius        = camera.position.length();  // 回転半径を初期距離で固定
+let  autoStartTime  = performance.now();         // 自動回転の基準時刻
+
+/* ========= 01. ポインター操作で停止 ========= */
+function markUserInteraction(){
+  autoRotate   = false;                          // 止める
+  lastUserTime = performance.now();
+  angleOffset  = Math.atan2(camera.position.x, camera.position.z); // 現在の位相
+}
+addEventListener('pointerdown', markUserInteraction);
+  
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -122,21 +139,29 @@ addEventListener('click',()=>{
   if(current) window.open(current.userData.url,'_blank');
 });
 
-/* ===== 5.レンダーループ ===== */
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+/* ========= 5. アニメーションループ ========= */
 function animate(){
-  requestAnimationFrame(animate);
+requestAnimationFrame(animate);
 
-  // 経過時間 t（秒）→ 角度 θ = ωt
-  const t = clock.getElapsedTime();
-  const angle = ANGULAR_SPEED * t;
+const now = performance.now();
 
-  // 円軌道座標（XZ 平面をぐるり）
-  camera.position.x =  radius * Math.sin(angle);
-  camera.position.z =  radius * Math.cos(angle);
-  camera.lookAt(0, 5, 0);   // 原点を少し上（必要なら変更）
+/* 5-A. 自動 → 手動 に切り替わって10秒経過したら再度自動開始 */
+if(!autoRotate && now - lastUserTime > AUTO_DELAY_MS){
+  autoRotate    = true;
+  autoStartTime = now - angleOffset/ANGULAR_SPEED * 1000; // 位相を保ったまま再開
+}
 
-  renderer.render(scene, camera);
+/* 5-B. 自動回転モードのときだけカメラ座標を更新 */
+  if(autoRotate){
+    const t     = (now - autoStartTime)/1000;     // 秒
+    const theta = ANGULAR_SPEED * t;
+    camera.position.x =  radius * Math.sin(theta);
+    camera.position.z =  radius * Math.cos(theta);
+    camera.lookAt(0,5,0);                         // 注視点（必要なら変える）
+  }
+
+  controls.update();                              // 手動時の操作も有効
+  renderer.render(scene,camera);
 }
 animate();
 </script>
