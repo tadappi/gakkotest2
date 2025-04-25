@@ -2,14 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>GLB Viewer – 2 Sprites + 自動回転/停止</title>
+  <title>GLB Viewer – 2 Sprites + 自動回転/停止 + 正しいツールチップ位置</title>
   <style>
     body{margin:0;overflow:hidden;background:#fff}
     canvas{display:block}
     #tooltip{position:absolute;display:none;z-index:10;background:rgba(255,255,255,.95);border:1px solid #999;border-radius:6px;padding:6px;font:14px/1 sans-serif}
     #tooltip img{width:160px;height:auto;display:block;margin-bottom:4px}
   </style>
-  <!-- three.js r147 (グローバル) -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -33,7 +32,6 @@ const sun = new THREE.DirectionalLight(0xffffff,1);sun.position.set(30,100,30);s
 /***** 1. モデル読み込み *****/
 new THREE.GLTFLoader().load('model6.glb',g=>{
   const m=g.scene;m.scale.set(.1,.1,.1);
-  // 角度を degree 指定
   const deg=d=>d*Math.PI/180; m.rotation.set(deg(270),deg(0),deg(0));
   scene.add(m);
 });
@@ -46,38 +44,59 @@ const spriteInfo=[
 const sprites=[];const tex=new THREE.TextureLoader();
 spriteInfo.forEach(d=>{
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex.load(d.img),transparent:true}));
-  sp.scale.set(1,1,1);sp.position.set(...d.pos);sp.userData=d;scene.add(sp);sprites.push(sp);
+  sp.scale.set(1,1,1);
+  sp.position.set(...d.pos);
+  sp.userData=d;
+  scene.add(sp);
+  sprites.push(sp);
 });
 
 /***** 3. 自動回転制御 *****/
-const REV_PER_MIN=0.5;                 // ★回転速度 (0.5 = 2分/周)
+const REV_PER_MIN=0.5;                 // 回転速度 (0.5 = 2分/周)
 const ANG_SPEED = REV_PER_MIN*2*Math.PI/60;
-const AUTO_DELAY=10000;                // ★無操作で再開するまで(ms)
+const AUTO_DELAY=10000;                // 無操作で再開(ms)
 let   autoRot=true; let lastUser=performance.now();
 const radius=camera.position.length(); const baseY=camera.position.y; const clock=new THREE.Clock();
 function stopAuto(){autoRot=false;lastUser=performance.now();}
 addEventListener('pointerdown',stopAuto); addEventListener('wheel',stopAuto);
 
 /***** 4. ホバー処理 & クリック *****/
-const ray=new THREE.Raycaster(); const mouse=new THREE.Vector2(); const tip=document.getElementById('tooltip'); let cur=null;
-addEventListener('mousemove',e=>{mouse.x=(e.clientX/innerWidth)*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;});
+const ray=new THREE.Raycaster(); const mouse=new THREE.Vector2();
+const tip=document.getElementById('tooltip');
+let cur=null;                       // 今当たってるスプライト
+let mousePixX=0, mousePixY=0;       // マウス座標(px)
+
+addEventListener('mousemove',e=>{
+  mousePixX=e.clientX; mousePixY=e.clientY;
+  mouse.x=(e.clientX/innerWidth)*2-1;
+  mouse.y=-(e.clientY/innerHeight)*2+1;
+});
 addEventListener('click',()=>{if(cur)window.open(cur.userData.url,'_blank');});
 
 /***** 5. ループ *****/
 function animate(){requestAnimationFrame(animate);
   const now=performance.now();
-  // ─ 自動回転更新 ─
   if(!autoRot && now-lastUser>AUTO_DELAY){clock.start();autoRot=true;}
-  if(autoRot){const t=clock.getElapsedTime();const th=ANG_SPEED*t;camera.position.x= radius*Math.sin(th);camera.position.z= radius*Math.cos(th);camera.position.y=baseY;camera.lookAt(0,5,0);}
+  if(autoRot){
+    const t=clock.getElapsedTime();
+    const th=ANG_SPEED*t;
+    camera.position.x= radius*Math.sin(th);
+    camera.position.z= radius*Math.cos(th);
+    camera.position.y= baseY;
+    camera.lookAt(0,5,0);
+  }
   controls.update();
-  // ─ ホバー判定 ─
-  ray.setFromCamera(mouse,camera);const hit=ray.intersectObjects(sprites)[0]?.object||null;
-  if(hit!==cur){cur=hit;tip.style.display=cur?'block':'none';}
-  if(cur){const d=cur.userData;tip.innerHTML=`<img src="${d.thumb}"><strong>${d.label}</strong>`;tip.style.left=event.clientX+12+'px';tip.style.top=event.clientY+12+'px';}
+
+  ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObjects(sprites)[0]?.object||null;
+  if(hit!==cur){cur=hit; tip.style.display=cur?'block':'none';}
+  if(cur){const d=cur.userData; tip.innerHTML=`<img src="${d.thumb}"><strong>${d.label}</strong>`; tip.style.left=mousePixX+12+'px'; tip.style.top=mousePixY+12+'px';}
+
   renderer.render(scene,camera);
 }
 animate();
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);} );
+
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 </script>
 </body>
 </html>
