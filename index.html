@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>GLB Viewer – 2 Sprites with Hover/Link</title>
+<style>
+  body {margin:0;overflow:hidden;background:#fff;}
+  canvas{display:block}
+  /* ─── ホバーラベル ─── */
+  #tooltip{
+    position:absolute;display:none;z-index:10;
+    background:rgba(255,255,255,.95);border:1px solid #999;
+    border-radius:6px;padding:6px;font:14px/1 sans-serif
+  }
+  #tooltip img{width:160px;height:auto;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+<div id="tooltip"></div>
+
+<!-- Three r147（ビルド版）＋ OrbitControls.js & GLTFLoader.js -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<script>
+/* ===== 0.基本セットアップ ===== */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xcccccc);
+scene.add(new THREE.AxesHelper(10));
+
+const camera   = new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000);
+camera.position.set(0,18,23);
+const radius = camera.position.length();   // 現在のカメラ距離をそのまま半径に
+const clock  = new THREE.Clock();          // 経過時間を測る時計
+const REV_PER_MIN   = 0.5;   // 1回転 / 1分（=60秒） に相当する角速度［ラジアン/秒］
+const ANGULAR_SPEED = REV_PER_MIN * 2 * Math.PI / 60;  // ω = 2π / 60
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera,renderer.domElement);
+controls.target.set(0,5,0); controls.update();
+
+/* ===== 1.ライト ===== */
+scene.add(new THREE.AmbientLight(0x888888));
+const dir = new THREE.DirectionalLight(0xffffff,1);
+dir.position.set(30,100,30); scene.add(dir);
+
+/* ========= モデル読み込み ========= */
+new THREE.GLTFLoader().load('model6.glb', g => {
+  const m = g.scene;
+  m.scale.set(0.1, 0.1, 0.1);
+  m.position.set(0, 0, 0);      // 必要なら位置も
+
+/* --- ここから 角度を degree で指定 ---------- */
+  const deg   = d => d * Math.PI / 180;      // 変換ヘルパ
+  const rot   = { x: 270, y: 0, z: 0 };      // ← 好きな角度（°）に変更
+  m.rotation.set( deg(rot.x), deg(rot.y), deg(rot.z) );
+/* ------------------------------------------- */
+
+  scene.add(m);
+});
+
+  /* ===== 3.スプライト定義 & 生成 ===== */
+const spriteInfo = [
+  { img:'1.png', pos:[  1, 1,  1], label:'① 校庭の動画を見る',
+    thumb:'thumb1.jpg', url:'https://youtu.be/3JjAXCMe9mc' },
+
+  { img:'2.png', pos:[  2, 2, -7], label:'② 校舎の紹介',
+    thumb:'thumb2.jpg', url:'https://youtu.be/k4PDAdRwEDo' },
+
+  { img:'3.png', pos:[ -5, 3, -4], label:'③ 体育館の様子',
+    thumb:'thumb3.jpg', url:'https://youtu.be/klDA1XaWdmQ' },
+
+  { img:'4.png', pos:[-10, 4,  2], label:'④ プールエリア',
+    thumb:'thumb4.jpg', url:'https://youtu.be/UMCrUJZyf_s' },
+
+  { img:'5.png', pos:[  4, 2,  8], label:'⑤ 登校口付近',
+    thumb:'thumb5.jpg', url:'https://youtu.be/gTFoiQv0ubE' }
+];
+
+const loader = new THREE.TextureLoader();
+const sprites=[], group=new THREE.Group();       // グループにまとめると管理しやすい
+spriteInfo.forEach(info=>{
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:loader.load(info.img),transparent:true}));
+  sp.scale.set(1,1,1);
+  sp.position.set(...info.pos);
+  sp.userData=info;
+  sprites.push(sp); group.add(sp);
+});
+scene.add(group);
+
+/* ===== 4.ホバー & クリック ===== */
+const ray   = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tip   = document.getElementById('tooltip');
+let current=null;
+
+function setMouse(e){
+  mouse.x =  (e.clientX/innerWidth)*2-1;
+  mouse.y = -(e.clientY/innerHeight)*2+1;
+}
+addEventListener('mousemove',e=>{
+  setMouse(e);
+  ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObjects(sprites)[0]?.object||null;
+
+  if(hit!==current){
+    current=hit;
+    if(current){
+      const d=current.userData;
+      tip.innerHTML=`<img src="${d.thumb}"><strong>${d.label}</strong>`;
+      tip.style.left=e.clientX+12+'px';
+      tip.style.top =e.clientY+12+'px';
+      tip.style.display='block';
+    }else tip.style.display='none';
+  }
+});
+addEventListener('click',()=>{
+  if(current) window.open(current.userData.url,'_blank');
+});
+
+/* ===== 5.レンダーループ ===== */
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+function animate(){
+  requestAnimationFrame(animate);
+
+  // 経過時間 t（秒）→ 角度 θ = ωt
+  const t = clock.getElapsedTime();
+  const angle = ANGULAR_SPEED * t;
+
+  // 円軌道座標（XZ 平面をぐるり）
+  camera.position.x =  radius * Math.sin(angle);
+  camera.position.z =  radius * Math.cos(angle);
+  camera.lookAt(0, 5, 0);   // 原点を少し上（必要なら変更）
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
