@@ -31,10 +31,17 @@ scene.add(new THREE.AxesHelper(10));
 
 const camera   = new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000);
 camera.position.set(0,18,23);
-const radius = camera.position.length();   // 現在のカメラ距離をそのまま半径に
-const clock  = new THREE.Clock();          // 経過時間を測る時計
-const REV_PER_MIN   = 0.5;   // 1回転 / 1分（=60秒） に相当する角速度［ラジアン/秒］
-const ANGULAR_SPEED = REV_PER_MIN * 2 * Math.PI / 60;  // ω = 2π / 60
+
+/* ========= 3. 自動回転パラメータ  ========= */
+const REV_PER_MIN   = 0.5;                       // ← ここでスピード調整（0.5=2分で1周）
+const ANGULAR_SPEED = REV_PER_MIN * 2*Math.PI/60;
+
+const AUTO_DELAY_MS = 10_000;                    // 無操作10秒で自動回転再開
+let  autoRotate     = true;                      // 現在自動回転中？
+let  lastUserTime   = performance.now();         // 最後に操作した時刻
+let  angleOffset    = 0;                         // 再開時の位相補正用
+const radius        = camera.position.length();  // 回転半径を初期距離で固定
+let  autoStartTime  = performance.now();         // 自動回転の基準時刻
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth,innerHeight);
@@ -122,6 +129,16 @@ addEventListener('click',()=>{
   if(current) window.open(current.userData.url,'_blank');
 });
 
+/* ========= 4. ポインター操作で停止 ========= */
+function markUserInteraction(){
+  autoRotate   = false;                          // 止める
+  lastUserTime = performance.now();
+  angleOffset  = Math.atan2(camera.position.x, camera.position.z); // 現在の位相
+}
+addEventListener('pointerdown', markUserInteraction);
+addEventListener('wheel',       markUserInteraction);  // ホイールでも止めたい場合
+
+  
 /* ===== 5.レンダーループ ===== */
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 function animate(){
